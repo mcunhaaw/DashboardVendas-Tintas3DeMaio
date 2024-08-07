@@ -12,12 +12,8 @@ class SalesDashboard:
 
     def run(self):
         st.title('Dashboard de Vendas - Tintas Três de Maio')
-
-        # Criar instâncias do DataLoader com o caminho relativo à pasta 'Data'
         sales_loader = DataLoader(os.path.join('Data', self.sales_file_path))
         returns_loader = DataLoader(os.path.join('Data', self.returns_file_path))
-        
-        # Carregar dados
         try:
             sales_data = sales_loader.load_data()
             returns_data = returns_loader.load_data()
@@ -25,12 +21,12 @@ class SalesDashboard:
             st.error(str(e))
             return
 
-        # Exibir tabelas de dados
+        # Tabela de dados
         st.subheader('Dados de Vendas')
         st.dataframe(
             sales_data.head().style
             .background_gradient(cmap='Blues')
-            .format("{:.2f}")
+            .format("{:.2f}", subset=sales_data.select_dtypes(include=['number']).columns)
             .set_properties(**{'font-size': '18px', 'text-align': 'center'})
             .set_table_styles(
                 [{'selector': 'thead th', 'props': [('font-size', '20px')]}]
@@ -41,48 +37,54 @@ class SalesDashboard:
         st.dataframe(
             returns_data.head().style
             .background_gradient(cmap='Reds')
-            .format("{:.2f}")
+             .format("{:.2f}", subset=returns_data.select_dtypes(include=['number']).columns)
             .set_properties(**{'font-size': '18px', 'text-align': 'center'})
             .set_table_styles(
                 [{'selector': 'thead th', 'props': [('font-size', '20px')]}]
             )
         )
 
-        # Sales Analysis
+        # Análise de vendas
         sales_analysis = SalesAnalysis(sales_data)
         sales_analysis.preprocess_data()
 
-        # Returns Analysis
+        # Análise das devoluções
         returns_analysis = ReturnsAnalysis(returns_data)
         returns_analysis.preprocess_data()
 
-        # Daily Sales Analysis
+        # Análise diária
         daily_sales = DailySales(sales_data, returns_data)
         daily_sales.preprocess_data()
 
-        # Display Sales Plots
+        # Mostrar gráfico de vendas mensais
         st.subheader('Vendas mensais')
         fig_sales = sales_analysis.plot_monthly_sales()
         st.plotly_chart(fig_sales)
 
-        # Display das devoluções
+        # Mostrar gráfico de devoluções mensais
         st.subheader('Devoluções mensais')
         fig_returns = returns_analysis.plot_monthly_returns()
         st.plotly_chart(fig_returns)
 
-        # Display vendas líquidas diárias
+        # Mostrar vendas líquidas diárias ( = vendas diárias - devoluções)
         st.subheader('Vendas Líquidas Diárias')
         daily_sales_data = daily_sales.daily_sales()
-        st.dataframe(
-            daily_sales_data.pivot_table(index='Dia', columns='Mes', values='VendasLiquidas')
-            .style.background_gradient(cmap='Greens')
-            .format("{:.2f}")
-            .set_properties(**{'font-size': '18px', 'text-align': 'center'})
-            .set_table_styles(
-                [{'selector': 'thead th', 'props': [('font-size', '20px')]}]
+        # vERIFICAÇÃO DAS COLUNAS
+        required_columns = ['Dia', 'Mes', 'VendasLiquidas']
+        if all(column in daily_sales_data.columns for column in required_columns):
+            pivot_table = daily_sales_data.pivot_table(index='Dia', columns='Mes', values='VendasLiquidas')
+            st.dataframe(
+                pivot_table.style
+                .background_gradient(cmap='Greens')
+                .format("{:.2f}", subset=pivot_table.select_dtypes(include=['number']).columns)
+                .set_properties(**{'font-size': '18px', 'text-align': 'center'})
+                .set_table_styles(
+                    [{'selector': 'thead th', 'props': [('font-size', '20px')]}]
+                )
             )
-        )
-
+        else:
+            st.error("As colunas necessárias para a tabela de vendas líquidas diárias não estão presentes.")
+        # Vendas totais - macro
         st.subheader('Vendas Totais Diárias - gráfico estimado')
         fig_daily_sales = daily_sales.plot_daily_sales()
         st.plotly_chart(fig_daily_sales)
